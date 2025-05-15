@@ -1,0 +1,866 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SKU Distribution Visualization</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0f7fa 0%, #f1f8e9 100%);
+      min-height: 100vh;
+    }
+    
+    .visualization-container {
+      position: relative;
+      width: 900px;
+      height: 600px;
+      margin: 0 auto;
+      border-radius: 12px;
+      background: linear-gradient(to bottom, #f8faff 0%, #f0f7ff 100%);
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .control-button {
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+    
+    .control-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    }
+    
+    .control-button.active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1) inset;
+    }
+    
+    .status-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 50px;
+      background: rgba(255,255,255,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+    
+    .stage-title {
+      font-weight: 600;
+      color: #004c8c;
+    }
+    
+    .counters {
+      display: flex;
+      gap: 20px;
+    }
+    
+    .counter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .counter-value {
+      font-weight: 700;
+      color: #004c8c;
+      font-size: 18px;
+    }
+    
+    .store {
+      position: absolute;
+      width: 60px;
+      height: 90px;
+      transition: opacity 0.8s ease, transform 0.8s ease;
+      z-index: 5;
+    }
+    
+    .dandelion {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .stem {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 4px;
+      height: 45px;
+      background: linear-gradient(to top, #00695c, #26a69a);
+      transform: translateX(-50%);
+      border-radius: 4px;
+      z-index: 1;
+    }
+    
+    .flower-head {
+      position: absolute;
+      bottom: 45px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #cfe8ff;
+      transition: all 1s ease;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(207, 232, 255, 0.8);
+    }
+    
+    .flower-head.mature {
+      width: 40px;
+      height: 40px;
+      background: #ff9d3f;
+      box-shadow: 0 0 15px rgba(255, 157, 63, 0.8);
+    }
+    
+    .flower-center {
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(135deg, #0053a0, #0076ce);
+      border-radius: 50%;
+      transition: all 1s ease;
+    }
+    
+    .flower-head.mature .flower-center {
+      width: 14px;
+      height: 14px;
+      background: linear-gradient(135deg, #cc7000, #f57c00);
+    }
+    
+    .leaf {
+      position: absolute;
+      width: 20px;
+      height: 10px;
+      background: linear-gradient(to top, #00796b, #4db6ac);
+      border-radius: 10px 10px 0 10px;
+      bottom: 20px;
+      opacity: 0;
+      transition: all 0.8s ease;
+      z-index: 2;
+    }
+    
+    .leaf.left {
+      left: 3px;
+      transform: rotate(-30deg);
+    }
+    
+    .leaf.right {
+      right: 3px;
+      transform: rotate(30deg) scaleX(-1);
+    }
+    
+    .store.visible .leaf {
+      opacity: 1;
+    }
+    
+    .seed {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #ffbd66;
+      border-radius: 50%;
+      box-shadow: 0 0 5px rgba(255, 157, 63, 0.9), 0 0 10px rgba(255, 131, 0, 0.7);
+      z-index: 10;
+      pointer-events: none;
+      border: 1px solid rgba(255, 112, 0, 0.5);
+    }
+    
+    .seed::before {
+      content: '';
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #ff9100;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    
+    .store.hidden {
+      opacity: 0.2;
+    }
+    
+    .store.visible {
+      opacity: 1;
+    }
+    
+    .store.highlight .flower-head {
+      transform: translateX(-50%) scale(1.1);
+    }
+    
+    .petal {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      background: #ffbd66;
+      border-radius: 50%;
+      box-shadow: 0 0 5px rgba(255, 157, 63, 0.8);
+      opacity: 0.8;
+      z-index: 2;
+      border: 1px solid rgba(255, 112, 0, 0.3);
+    }
+    
+    .info-container {
+      position: absolute;
+      right: -280px;
+      top: 20px;
+      width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .overlay-text {
+      background: rgba(255,255,255,0.9);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      color: #004c8c;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      font-size: 15px;
+      line-height: 1.4;
+      transition: opacity 0.6s ease;
+    }
+    
+    .legend {
+      background: rgba(255,255,255,0.9);
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    
+    .legend-title {
+      font-weight: 600;
+      color: #004c8c;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    
+    .legend-item:last-child {
+      margin-bottom: 8px;
+    }
+    
+    .legend-icon {
+      width: 40px;
+      height: 40px;
+      position: relative;
+      margin-right: 10px;
+    }
+    
+    .legend-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #004c8c;
+    }
+    
+    .wrapper {
+      position: relative;
+      width: 1180px;
+      margin: 0 auto;
+    }
+    
+    @keyframes float {
+      0% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-5px) rotate(3deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+    
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="font-sans p-6">
+  <div class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-blue-800 mb-3">Hot SKU Detection and Distribution</h1>
+    <p class="text-blue-700 max-w-2xl mx-auto">Hot-selling products expand from successful pilot stores to the entire network</p>
+  </div>
+  
+  <div class="controls">
+    <button id="stage-1-btn" class="control-button bg-blue-100 border-2 border-blue-300 text-blue-800 hover:bg-blue-200">
+      Stage 1: Initial 3
+    </button>
+    <button id="stage-2-btn" class="control-button bg-blue-100 border-2 border-blue-300 text-blue-800 hover:bg-blue-200">
+      Stage 2: Expand to 8
+    </button>
+    <button id="stage-3-btn" class="control-button bg-blue-100 border-2 border-blue-300 text-blue-800 hover:bg-blue-200">
+      Stage 3: Expand to 15
+    </button>
+    <button id="stage-4-btn" class="control-button bg-blue-100 border-2 border-blue-300 text-blue-800 hover:bg-blue-200">
+      Stage 4: All Stores
+    </button>
+  </div>
+  
+  <div class="wrapper">
+    <div class="visualization-container" id="visual-container">
+      <div class="status-bar">
+        <div class="stage-title" id="stage-title">Initial: 3 hot-selling stores</div>
+        <div class="counters">
+          <div class="counter-item">
+            <div>Hot Sell:</div>
+            <div id="mature-count" class="counter-value">3</div>
+          </div>
+          <div class="counter-item">
+            <div>Total:</div>
+            <div id="total-count" class="counter-value">3</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="info-container">
+      <div id="overlay-text" class="overlay-text">
+        Initial 3 stores with excellent SKU sales performance
+      </div>
+      
+      <div class="legend">
+        <div class="legend-title">Store Status</div>
+        <div class="legend-item">
+          <div class="legend-icon">
+            <div style="position: absolute; bottom: 0; left: 50%; width: 4px; height: 25px; background: linear-gradient(to top, #00695c, #26a69a); transform: translateX(-50%); border-radius: 4px;"></div>
+            <div style="position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 30px; height: 30px; border-radius: 50%; background: #ff9d3f; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(255, 157, 63, 0.8);">
+              <div style="width: 12px; height: 12px; background: linear-gradient(135deg, #cc7000, #f57c00); border-radius: 50%;"></div>
+            </div>
+          </div>
+          <div class="legend-label">Hot Sell Store</div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-icon">
+            <div style="position: absolute; bottom: 0; left: 50%; width: 4px; height: 25px; background: linear-gradient(to top, #00695c, #26a69a); transform: translateX(-50%); border-radius: 4px;"></div>
+            <div style="position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 25px; height: 25px; border-radius: 50%; background: #cfe8ff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(207, 232, 255, 0.8);">
+              <div style="width: 8px; height: 8px; background: linear-gradient(135deg, #0053a0, #0076ce); border-radius: 50%;"></div>
+            </div>
+          </div>
+          <div class="legend-label">Growing Store</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Global store state variables
+    let currentState = {
+      currentStage: 1,
+      visibleStores: [],
+      matureStores: []
+    };
+    
+    // Generate store positions
+    function generateStorePositions() {
+      return [
+        // Initial 3 - upper left region
+        {x: 150, y: 150},  // 0
+        {x: 250, y: 180},  // 1
+        {x: 180, y: 250},  // 2
+        
+        // Expand to 8 - additional 5 stores - upper right region
+        {x: 650, y: 140},  // 3
+        {x: 750, y: 180},  // 4
+        {x: 600, y: 250},  // 5
+        {x: 700, y: 300},  // 6
+        {x: 550, y: 350},  // 7
+        
+        // Expand to 15 - additional 7 stores - middle region
+        {x: 300, y: 350},  // 8
+        {x: 400, y: 150},  // 9
+        {x: 480, y: 280},  // 10
+        {x: 380, y: 450},  // 11
+        {x: 250, y: 450},  // 12
+        {x: 520, y: 450},  // 13
+        {x: 450, y: 200},  // 14
+        
+        // Network-wide - remaining 5 stores - various regions
+        {x: 180, y: 350},  // 15
+        {x: 330, y: 250},  // 16
+        {x: 650, y: 450},  // 17
+        {x: 750, y: 400},  // 18
+        {x: 800, y: 280}   // 19
+      ];
+    }
+    
+    // Create dandelion HTML
+    function createDandelion() {
+      return `
+        <div class="dandelion">
+          <div class="flower-head">
+            <div class="flower-center"></div>
+          </div>
+          <div class="leaf left"></div>
+          <div class="leaf right"></div>
+          <div class="stem"></div>
+        </div>
+      `;
+    }
+    
+    // Seed animation
+    function createSeedAnimation(fromX, fromY, toX, toY) {
+      const container = document.getElementById('visual-container');
+      const seed = document.createElement('div');
+      seed.className = 'seed';
+      
+      seed.style.left = `${fromX}px`;
+      seed.style.top = `${fromY}px`;
+      
+      container.appendChild(seed);
+      
+      const randomX1 = (Math.random() - 0.5) * 100;
+      const randomY1 = (Math.random() - 0.5) * 100;
+      const randomX2 = (Math.random() - 0.5) * 150;
+      const randomY2 = -(Math.random() * 100);
+      const delay = Math.random() * 300;
+      
+      setTimeout(() => {
+        seed.animate([
+          { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 0.9, offset: 0 },
+          { transform: `translate(${(toX-fromX)*0.2 + randomX1}px, ${(toY-fromY)*0.2 + randomY1}px) scale(1.1) rotate(${randomX1/5}deg)`, opacity: 0.8, offset: 0.2 },
+          { transform: `translate(${(toX-fromX)*0.5 + randomX2}px, ${(toY-fromY)*0.4 + randomY2}px) scale(1.2) rotate(${randomX2/4}deg)`, opacity: 0.7, offset: 0.5 },
+          { transform: `translate(${(toX-fromX)*0.7 + randomX1/2}px, ${(toY-fromY)*0.7 + randomY1/3}px) scale(1.1) rotate(${-randomX1/6}deg)`, opacity: 0.5, offset: 0.7 },
+          { transform: `translate(${(toX-fromX)}px, ${(toY-fromY)}px) scale(1) rotate(${randomX2/8}deg)`, opacity: 0.3, offset: 1 }
+        ], {
+          duration: 3000 + delay,
+          easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+          fill: 'forwards'
+        });
+        
+        // Petal effects
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => {
+            const petal = document.createElement('div');
+            petal.className = 'petal';
+            petal.style.left = `${fromX + (Math.random() - 0.5) * 10}px`;
+            petal.style.top = `${fromY + (Math.random() - 0.5) * 10}px`;
+            container.appendChild(petal);
+            
+            const petRandomX = (Math.random() - 0.5) * 200;
+            const petRandomY = (Math.random() - 0.5) * 200;
+            
+            petal.animate([
+              { transform: 'translate(0, 0) scale(1)', opacity: 0.8, offset: 0 },
+              { transform: `translate(${petRandomX/2}px, ${petRandomY/2 - 50}px) scale(1.2)`, opacity: 0.6, offset: 0.5 },
+              { transform: `translate(${petRandomX}px, ${petRandomY}px) scale(0.8)`, opacity: 0, offset: 1 }
+            ], {
+              duration: 4000 + Math.random() * 2000,
+              easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+              fill: 'forwards'
+            });
+            
+            setTimeout(() => {
+              container.removeChild(petal);
+            }, 4000 + Math.random() * 2000);
+          }, i * 150 + Math.random() * 300);
+        }
+        
+        // Remove seed after animation
+        setTimeout(() => {
+          seed.style.opacity = '0';
+          setTimeout(() => {
+            container.removeChild(seed);
+          }, 500);
+        }, 2800 + delay);
+      }, delay);
+    }
+    
+    // Multiple seeds
+    function createMultipleSeeds(fromStore, toStore, count = 5, staggerDelay = 150) {
+      const fromX = parseInt(fromStore.style.left) + 30;
+      const fromY = parseInt(fromStore.style.top) + 45;
+      const toX = parseInt(toStore.style.left) + 30;
+      const toY = parseInt(toStore.style.top) + 45;
+      
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+          createSeedAnimation(fromX, fromY, toX, toY);
+        }, i * staggerDelay);
+      }
+    }
+    
+    // Main application
+    document.addEventListener('DOMContentLoaded', function() {
+      const container = document.getElementById('visual-container');
+      const positions = generateStorePositions();
+      const storeCount = positions.length;
+      const stores = [];
+      
+      // Stage definitions
+      const initialStores = [0, 1, 2];
+      const topEightStores = [...initialStores, 3, 4, 5, 6, 7];
+      const topFifteenStores = [...topEightStores, 8, 9, 10, 11, 12, 13, 14];
+      const allStores = Array.from({length: storeCount}, (_, i) => i);
+      
+      // Create all stores
+      positions.forEach((pos, index) => {
+        const store = document.createElement('div');
+        store.className = 'store hidden';
+        store.id = `store-${index}`;
+        store.style.left = `${pos.x - 30}px`;
+        store.style.top = `${pos.y - 45}px`;
+        store.innerHTML = createDandelion();
+        
+        container.appendChild(store);
+        stores.push(store);
+      });
+      
+      // Update counter
+      function updateCounter(matureCount, totalCount) {
+        document.getElementById('mature-count').textContent = matureCount;
+        document.getElementById('total-count').textContent = totalCount;
+      }
+      
+      // Update text prompt
+      function updateOverlayText(text) {
+        const overlay = document.getElementById('overlay-text');
+        overlay.style.opacity = 0;
+        
+        setTimeout(() => {
+          overlay.textContent = text;
+          overlay.style.opacity = 1;
+        }, 500);
+      }
+      
+      // Reset all stores
+      function resetAllStores() {
+        stores.forEach(store => {
+          store.className = 'store hidden';
+          const flowerHead = store.querySelector('.flower-head');
+          flowerHead.classList.remove('mature');
+          store.classList.remove('animate-float');
+        });
+      }
+      
+      // Update button styles
+      function updateButtonStyles(activeStage) {
+        document.querySelectorAll('.control-button').forEach((btn, index) => {
+          btn.classList.remove('active');
+          if (index + 1 === activeStage) {
+            btn.classList.add('active');
+          }
+        });
+      }
+      
+      // Stage 1: Initial 3 stores
+      function executeStage1() {
+        resetAllStores();
+        
+        // Show initial 3
+        initialStores.forEach(index => {
+          const store = stores[index];
+          store.className = 'store visible highlight animate-float';
+          const flowerHead = store.querySelector('.flower-head');
+          flowerHead.classList.add('mature');
+        });
+        
+        // Update status
+        currentState = {
+          currentStage: 1,
+          visibleStores: [...initialStores],
+          matureStores: [...initialStores]
+        };
+        
+        document.getElementById('stage-title').textContent = "Stage 1: Initial 3 stores";
+        updateCounter(3, 3);
+        updateOverlayText("Initial 3 stores with excellent SKU sales performance");
+        updateButtonStyles(1);
+      }
+      
+      // Stage 2: Expand to 8
+      function executeStage2() {
+        if (currentState.currentStage < 1) {
+          executeStage1();
+          setTimeout(() => executeStage2(), 1000);
+          return;
+        }
+        
+        // Set initial stores state
+        stores.forEach((store, index) => {
+          if (initialStores.includes(index)) {
+            store.className = 'store visible highlight animate-float';
+            const flowerHead = store.querySelector('.flower-head');
+            flowerHead.classList.add('mature');
+          } else {
+            store.className = 'store hidden';
+            const flowerHead = store.querySelector('.flower-head');
+            flowerHead.classList.remove('mature');
+          }
+        });
+        
+        document.getElementById('stage-title').textContent = "Stage 2: Expanding to 8 stores";
+        updateOverlayText("Hot products from 3 initial stores spreading to 5 new locations");
+        updateButtonStyles(2);
+        
+        // Additional 5 stores
+        const newStores = topEightStores.filter(index => !initialStores.includes(index));
+        
+        // Send seeds
+        initialStores.forEach((fromIndex, sourceIdx) => {
+          newStores.forEach((toIndex, targetIdx) => {
+            setTimeout(() => {
+              createMultipleSeeds(stores[fromIndex], stores[toIndex], 4, 200);
+            }, (sourceIdx * 5 + targetIdx) * 300);
+          });
+        });
+        
+        // Show additional stores
+        setTimeout(() => {
+          newStores.forEach((index, i) => {
+            setTimeout(() => {
+              const store = stores[index];
+              store.className = 'store visible';
+            }, i * 300);
+          });
+          
+          // Update status
+          currentState = {
+            currentStage: 2,
+            visibleStores: [...topEightStores],
+            matureStores: [...initialStores]
+          };
+          
+          updateCounter(3, 8);
+        }, 3500);
+      }
+      
+      // Stage 3: Expand to 15
+      function executeStage3() {
+        if (currentState.currentStage < 2) {
+          executeStage2();
+          setTimeout(() => executeStage3(), 5000);
+          return;
+        }
+        
+        // Set the status of the first 8 stores
+        initialStores.forEach(index => {
+          stores[index].className = 'store visible highlight animate-float';
+          stores[index].querySelector('.flower-head').classList.add('mature');
+        });
+        
+        topEightStores.filter(index => !initialStores.includes(index)).forEach(index => {
+          stores[index].className = 'store visible';
+        });
+        
+        document.getElementById('stage-title').textContent = "Stage 3: Expanding to 15 stores";
+        updateOverlayText("8 stores performing well, now spreading to 7 more stores");
+        updateButtonStyles(3);
+        
+        // Mature the top 8 stores
+        setTimeout(() => {
+          topEightStores.filter(index => !initialStores.includes(index)).forEach((index, i) => {
+            setTimeout(() => {
+              const store = stores[index];
+              const flowerHead = store.querySelector('.flower-head');
+              flowerHead.classList.add('mature');
+              store.classList.add('animate-float');
+            }, i * 300);
+          });
+          
+          // Additional 7 stores
+          const newStores = topFifteenStores.filter(index => !topEightStores.includes(index));
+          
+          // Send seeds
+          setTimeout(() => {
+            newStores.forEach((toIndex, targetIdx) => {
+              const seedSources = topEightStores
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 2 + Math.floor(Math.random() * 2));
+              
+              setTimeout(() => {
+                seedSources.forEach((fromIndex, sourceIdx) => {
+                  setTimeout(() => {
+                    createMultipleSeeds(stores[fromIndex], stores[toIndex], 3, 250);
+                  }, sourceIdx * 500);
+                });
+              }, targetIdx * 400);
+            });
+            
+            // Show additional stores
+            setTimeout(() => {
+              newStores.forEach((index, i) => {
+                setTimeout(() => {
+                  const store = stores[index];
+                  store.className = 'store visible';
+                }, i * 300);
+              });
+              
+              // Update status
+              currentState = {
+                currentStage: 3,
+                visibleStores: [...topFifteenStores],
+                matureStores: [...topEightStores]
+              };
+              
+              updateCounter(8, 15);
+            }, 3000);
+          }, 2500);
+        }, 1500);
+      }
+      
+      // Stage 4: All stores
+      function executeStage4() {
+        if (currentState.currentStage < 3) {
+          executeStage3();
+          setTimeout(() => executeStage4(), 10000);
+          return;
+        }
+        
+        // Set the status of the first 15 stores
+        topEightStores.forEach(index => {
+          stores[index].className = 'store visible highlight animate-float';
+          stores[index].querySelector('.flower-head').classList.add('mature');
+        });
+        
+        topFifteenStores.filter(index => !topEightStores.includes(index)).forEach(index => {
+          stores[index].className = 'store visible';
+        });
+        
+        document.getElementById('stage-title').textContent = "Stage 4: Network-wide expansion";
+        updateOverlayText("Expanding to all stores to maximize sales potential");
+        updateButtonStyles(4);
+        
+        // Mature the top 15 stores
+        setTimeout(() => {
+          topFifteenStores.filter(index => !topEightStores.includes(index)).forEach((index, i) => {
+            setTimeout(() => {
+              const store = stores[index];
+              const flowerHead = store.querySelector('.flower-head');
+              flowerHead.classList.add('mature');
+              store.classList.add('animate-float');
+            }, i * 200);
+          });
+          
+          // Remaining stores
+          const remainingStores = allStores.filter(i => !topFifteenStores.includes(i));
+          
+          // Send seeds
+          setTimeout(() => {
+            remainingStores.forEach((toIndex, targetIdx) => {
+              const seedSources = topFifteenStores
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 2 + Math.floor(Math.random() * 2));
+              
+              setTimeout(() => {
+                seedSources.forEach((fromIndex, sourceIdx) => {
+                  setTimeout(() => {
+                    createMultipleSeeds(stores[fromIndex], stores[toIndex], 2, 300);
+                  }, sourceIdx * 400);
+                });
+                
+                // Show this store
+                setTimeout(() => {
+                  const store = stores[toIndex];
+                  store.className = 'store visible';
+                }, 1500);
+              }, targetIdx * 800);
+            });
+            
+            // Mature all stores
+            setTimeout(() => {
+              remainingStores.forEach((index, i) => {
+                setTimeout(() => {
+                  const store = stores[index];
+                  const flowerHead = store.querySelector('.flower-head');
+                  flowerHead.classList.add('mature');
+                  store.classList.add('animate-float');
+                }, i * 150);
+              });
+              
+              // Update status
+              currentState = {
+                currentStage: 4,
+                visibleStores: [...allStores],
+                matureStores: [...allStores]
+              };
+              
+              updateCounter(storeCount, storeCount);
+            }, remainingStores.length * 800 + 2000);
+          }, 2500);
+        }, 1500);
+      }
+      
+      // Random seed floating effects
+      function addRandomFloatingSeeds() {
+        setInterval(() => {
+          const matureStores = stores.filter(store => 
+            store.classList.contains('visible') && 
+            store.querySelector('.flower-head').classList.contains('mature')
+          );
+          
+          if (matureStores.length > 0) {
+            const randomStore = matureStores[Math.floor(Math.random() * matureStores.length)];
+            
+            const fromX = parseInt(randomStore.style.left) + 30;
+            const fromY = parseInt(randomStore.style.top) + 45;
+            const randomAngle = Math.random() * Math.PI * 2;
+            const distance = 50 + Math.random() * 150;
+            
+            const toX = fromX + Math.cos(randomAngle) * distance;
+            const toY = fromY + Math.sin(randomAngle) * distance;
+            
+            createSeedAnimation(fromX, fromY, toX, toY);
+          }
+        }, 3000);
+      }
+      
+      // Button events
+      document.getElementById('stage-1-btn').addEventListener('click', executeStage1);
+      document.getElementById('stage-2-btn').addEventListener('click', executeStage2);
+      document.getElementById('stage-3-btn').addEventListener('click', executeStage3);
+      document.getElementById('stage-4-btn').addEventListener('click', executeStage4);
+      
+      // Start
+      executeStage1();
+      addRandomFloatingSeeds();
+    });
+  </script>
+<script>window.parent.postMessage({ action: "ready" }, "*"); 
+ 
+window.console = new Proxy(console, {
+  get(target, prop) {
+    if (['log', 'warn', 'error'].includes(prop)) {
+      return new Proxy(target[prop], {
+        apply(fn, thisArg, args) {
+          fn.apply(thisArg, args);
+          window.parent.postMessage({ action: 'console', 
+            type: prop, 
+            args: args.map((arg) => {
+              try {
+                return JSON.stringify(arg).replace(/^["']|["']$/g, '');
+              } catch (e) {
+                return arg;
+              }
+            }) 
+          }, '*');
+        }
+      });
+    }
+    return target[prop];
+  }
+});
+</script></body>
+</html>
